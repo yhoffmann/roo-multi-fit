@@ -12,10 +12,12 @@ std::unique_ptr<RooArgSet> getParams(RooAbsPdf& pdf, RooRealVar& observable) {
 }
 
 void smearParam(RooRealVar& param, double smearingFraction) {
+  const double error = param.getError();
+  const double totalRange =
+      smearingFraction * (param.getMax() - param.getMin());
+
   const double smearingSigma =
-      (param.getError() > 0.0)
-          ? param.getError()
-          : smearingFraction * (param.getMax() - param.getMin());
+      (error > 0.0 && error > totalRange) ? error : totalRange;
 
   const double smeared =
       RooRandom::randomGenerator()->Gaus(param.getVal(), smearingSigma);
@@ -43,7 +45,7 @@ std::unique_ptr<RooFitResult> performMultiFit(RooAbsPdf& pdf,
   std::unique_ptr<RooArgSet> pParams = getParams(pdf, observable);
 
   std::unique_ptr<RooArgSet> pBestParams =
-      std::unique_ptr<RooArgSet>(static_cast<RooArgSet*>(pParams->snapshot()));
+      std::unique_ptr<RooArgSet>(pParams->snapshot());
   std::unique_ptr<RooFitResult> pBestResult;
   double bestNll = std::numeric_limits<double>::infinity();
 
@@ -56,7 +58,7 @@ std::unique_ptr<RooFitResult> performMultiFit(RooAbsPdf& pdf,
     const double nll = pResult->minNll();
 
     if (nll < bestNll) {
-      pBestParams.reset(static_cast<RooArgSet*>(pParams->snapshot()));
+      pBestParams.reset(pParams->snapshot());
       pBestResult = std::move(pResult);
       bestNll = nll;
     }
