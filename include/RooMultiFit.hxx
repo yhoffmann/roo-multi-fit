@@ -20,6 +20,7 @@ void smearParams(RooArgSet& params, const double smearingFraction = 0.15);
 /**
  * @brief Function that performs a fit multiple times, returing the best result
  *
+ * @Tparam Args... Additional arguments that are passed to `RooAbsPdf::fitTo`
  * @param [in] pdf The model to fit to the histogram
  * @param [in] observable The parameter to fit in
  * @param hist The histogram to fit the model to
@@ -34,9 +35,38 @@ void smearParams(RooArgSet& params, const double smearingFraction = 0.15);
  * Nll of different results. Will return the best result and, of course, also
  * change the parameters to their best values before returning.
  */
+template <typename... Args>
 std::unique_ptr<RooFitResult> performMultiFit(
     RooAbsPdf& pdf, RooRealVar& observable, const TH1& hist,
-    const std::size_t nFits, const double smearingFraction = 0.15);
+    const std::size_t nFits, const double smearingFraction, Args... args) {
+  RooDataHist dataHist("tempFitHist", "tempFitHist", observable, &hist);
+
+  std::unique_ptr<RooArgSet> pParams = getParams(pdf, observable);
+
+  std::unique_ptr<RooArgSet> pBestParams =
+      std::unique_ptr<RooArgSet>(pParams->snapshot());
+  std::unique_ptr<RooFitResult> pBestResult;
+  double bestNll = std::numeric_limits<double>::infinity();
+
+  for (std::size_t i = 0; i < nFits; i++) {
+    pParams->assign(*pBestParams);
+    smearParams(*pParams, smearingFraction);
+
+    auto pResult = std::unique_ptr<RooFitResult>(
+        pdf.fitTo(dataHist, std::forward<Args>(args)...));
+    const double nll = pResult->minNll();
+
+    if (nll < bestNll) {
+      pBestParams.reset(pParams->snapshot());
+      pBestResult = std::move(pResult);
+      bestNll = nll;
+    }
+  }
+
+  pParams->assign(*pBestParams);
+
+  return pBestResult;
+}
 
 }  // namespace RooMultiFit
 }  // namespace RooFitUtils
