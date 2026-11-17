@@ -2,7 +2,6 @@
 
 #include <RooDataHist.h>
 #include <RooRandom.h>
-#include <limits>
 
 namespace RooFitUtils {
 namespace RooMultiFit {
